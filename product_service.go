@@ -58,7 +58,7 @@ func CloseDB(){
 func main(){
 	fmt.Println("Products server begin to work")
 	defer fmt.Println("Products server stop working")
-	dbConnStr := "user=postgres password=admin dbname=productsDB sslmode=disable"
+	dbConnStr := "host=127.0.0.1 port=8080 dbname=shopDB user=postgres password=admin sslmode=disable"
 	db, err := sql.Open("postgres",dbConnStr)
 	if err != nil {
 		fmt.Println(err)

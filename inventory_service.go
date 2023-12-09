@@ -131,7 +131,7 @@ func CloseDB(){
 func main(){
 	fmt.Println("Inventory server begin to work")
 	defer fmt.Println("Inventory server stop working")
-	dbConnStr := "user=postgres password=admin dbname=productsDB sslmode=disable"
+	dbConnStr := "user=postgres password=admin dbname=shopBD sslmode=disable"
 	db, err := sql.Open("postgres",dbConnStr)
 	if err != nil {
 		fmt.Println(err)

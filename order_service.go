@@ -85,13 +85,11 @@ func handlerAddOrder(w http.ResponseWriter, r *http.Request) {
 		packageAndSendMess(w, ms)
 		return
 	}
-	key := "base"
-	val, err := client.Get(ctx, key).Result()
-	if val == "" {
+	pong,err := client.Ping(ctx).Result();
+	fmt.Println(pong,err)
+	if  err != nil {
 		fmt.Println("KeyDB server not available")
-		ms.Status = "ERROR"
-		ms.Info = "База данных недоступна"
-		packageAndSendMess(w, ms)
+		fmt.Println(pong, err)
 		return
 	}
 	var template string
@@ -115,7 +113,7 @@ func handlerAddOrder(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rs := bytes.NewReader(prodInve)
-		conn, err := http.Post("http://127.0.0.1:8083/sub_inv", "application/json", rs)
+		conn, err := http.Post("http://127.0.0.1:8011/sub_inv", "application/json", rs)
 		if err != nil {
 			fmt.Println(err)
 			ms.Status = "ERROR"
@@ -213,13 +211,10 @@ func handlerGetOrders(w http.ResponseWriter, r *http.Request) {
 		packageAndSendMess(w, ms)
 		return
 	}
-	key := "base"
-	val, err := client.Get(ctx, key).Result()
-	if val == "" {
+	pong,err := client.Ping(ctx).Result();
+	if  err != nil {
 		fmt.Println("KeyDB server not available")
-		ms.Status = "ERROR"
-		ms.Info = "База данных недоступна"
-		packageAndSendMess(w, ms)
+		fmt.Println(pong, err)
 		return
 	}
 	results, err := client.Do(ctx, "keys", input.Info+"*").Result()
@@ -234,7 +229,7 @@ func handlerGetOrders(w http.ResponseWriter, r *http.Request) {
 	if rec, ok := results.([]interface{}); ok {
 		for _, recc := range rec {
 			if reccc, ok := recc.(string); ok {
-				val, err = client.Get(ctx, reccc).Result()
+				val, err := client.Get(ctx, reccc).Result()
 				if err != nil {
 					fmt.Println(err)
 					ms.Status = "ERROR"
@@ -274,19 +269,18 @@ func main() {
 	fmt.Println("Connecting to keyDB server")
 	defer fmt.Println("Close connection to keyDB server")
 	client = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: "localhost:8002",
 	})
-	key := "base"
-	val, err := client.Get(ctx, key).Result()
-	if val == "" {
+	pong,err := client.Ping(ctx).Result();
+	if  err != nil {
 		fmt.Println("KeyDB server not available")
-		fmt.Println(err)
+		fmt.Println(pong, err)
 		return
 	}
 	fmt.Println("Connecting to DB was successful")
 	fmt.Println("Connecting to RabbitMQ")
 	defer fmt.Println("Close connection to RabbitMQ")
-	conn, err := ampq.Dial("amqp://guest:guest@localhost:5672/")
+	conn, err := ampq.Dial("amqp://localhost:8001/")
 	if err != nil {
 		fmt.Println("RabbitMQ is not available")
 		fmt.Println(err)

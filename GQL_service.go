@@ -2,11 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
-	"bytes"
 	"os"
 
 	"github.com/graphql-go/graphql"
@@ -36,31 +37,63 @@ func returnAllProducts() ([]*Product, error) {
 	return data, nil
 }
 
-func returnAllOrdersByUser(userName string)([]*RedisListOrderProducts,error){
-	mess := Mess{"OK",userName}
+func returnAllOrdersByUser(userName string) ([]*RedisListOrderProducts, error) {
+	mess := Mess{"OK", userName}
 	jsonMess, err := json.Marshal(mess)
-	if err != nil{
-		fmt.Println("Error in marshal mess to json, error:",err)
+	if err != nil {
+		fmt.Println("Error in marshal mess to json, error:", err)
 		return nil, nil
 	}
 	dt := bytes.NewReader(jsonMess)
 	conn, err := http.Post("http://127.0.0.1:8082/get_orders", "application/json", dt)
-	if err != nil{
-		fmt.Println("Error in getting order_server answer, error:",err)
+	if err != nil {
+		fmt.Println("Error in getting order_server answer, error:", err)
 		return nil, nil
 	}
 	connBody, err := ioutil.ReadAll(conn.Body)
-	if err != nil{
-		fmt.Println("Error in reading body order_server answer, error:",err)
+	if err != nil {
+		fmt.Println("Error in reading body order_server answer, error:", err)
 		return nil, nil
 	}
 	var orderList []*RedisListOrderProducts
-	err = json.Unmarshal(connBody,&orderList)
-	if err != nil{
-		fmt.Println("Error in unmarshal body order_server answer, error:",err)
+	err = json.Unmarshal(connBody, &orderList)
+	if err != nil {
+		fmt.Println("Error in unmarshal body order_server answer, error:", err)
 		return nil, nil
 	}
 	return orderList, nil
+}
+
+func sendToOrderService(creator string, names []string, numbers []int) (string, error) {
+	if len(names) != len(numbers) {
+		return "Количество записей товаров отлично от количества записей числа товаров", nil
+	}
+	var data ListOrderProducts
+	data.Creator = creator
+	var content []OrderProduct
+	for i := 0; i < len(names); i++ {
+		content = append(content, OrderProduct{names[i], numbers[i]})
+	}
+	data.List = content
+	jsonMess, err := json.Marshal(data)
+	if err != nil {
+		return "Ошибка в конвертировании данных в json", nil
+	}
+	dt := bytes.NewReader(jsonMess)
+	conn, err := http.Post("http://127.0.0.1:8082/add_order", "application/json", dt)
+	if err != nil {
+		return "Ошибка в получении ответа с сервиса заказов", nil
+	}
+	connBody, err := io.ReadAll(conn.Body)
+	if err != nil {
+		return "Ошибка в чтении ответа с сервиса заказов", nil
+	}
+	var result Mess
+	err = json.Unmarshal(connBody, &result)
+	if err != nil {
+		return "Ошибка конвертирования ответа сервиса заказов из json типа в структуру ответа", nil
+	}
+	return result.Info, nil
 }
 
 type Product struct {
@@ -74,8 +107,8 @@ type AllProucts struct {
 }
 
 type RedisListOrderProducts struct {
-	Creator string              `json:"creator"`
-	State   string              `json:"state"`
+	Creator string               `json:"creator"`
+	State   string               `json:"state"`
 	List    []*RedisOrderProduct `json:"list"`
 }
 
@@ -88,6 +121,16 @@ type RedisOrderProduct struct {
 type Mess struct {
 	Status string `json:"status"`
 	Info   string `json:"info"`
+}
+
+type OrderProduct struct {
+	Name   string `json:"name"`
+	Number int    `json:"number"`
+}
+
+type ListOrderProducts struct {
+	Creator string         `json:"creator"`
+	List    []OrderProduct `json:"list"`
 }
 
 func main() {
@@ -212,10 +255,40 @@ func main() {
 			},
 		},
 	})
-
+	mutationType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "Mutation",
+		Fields: graphql.Fields{
+			"createOrder": &graphql.Field{
+				Type: graphql.String,
+				Args: graphql.FieldConfigArgument{
+					"creator": &graphql.ArgumentConfig{
+						Type: graphql.String,
+					},
+					"productNames": &graphql.ArgumentConfig{
+						Type: graphql.NewList(graphql.String),
+					},
+					"productNumber": &graphql.ArgumentConfig{
+						Type: graphql.NewList(graphql.Int),
+					},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					var names []string
+					var numbers []int
+					for _, v := range p.Args["productNames"].([]interface{}) {
+						names = append(names, v.(string))
+					}
+					for _, v := range p.Args["productNumber"].([]interface{}) {
+						numbers = append(numbers, v.(int))
+					}
+					return sendToOrderService(p.Args["creator"].(string), names, numbers)
+				},
+			},
+		},
+	})
 	fmt.Println("Creating shcema for product_service")
 	schema, err := graphql.NewSchema(graphql.SchemaConfig{
-		Query: queryType,
+		Query:    queryType,
+		Mutation: mutationType,
 	})
 
 	if err != nil {
