@@ -494,6 +494,12 @@ Query{
   "order"("name": String): []*Order
 }
 ```
+Создание заказа:
+```GraphQL
+Mutation {
+  createOrder (creator: "Имя заказчика", productNames: ["Название товара", "Название товара"], productNumber: [Число единиц товара, Число единиц товара])
+}
+```
 ## Поддерживаемые запросы
 * **POST** http://127.0.0.1:8084/getAllProducts <br>
 Запрос тела в формате **GraphQL**: <br>
@@ -504,7 +510,7 @@ query {
         name
         desciption
     }
-    order(name:"Rueie") {
+    order(name:"Имя заказчика") {
         creator
         state
         list {
@@ -513,6 +519,9 @@ query {
             state
         }
     }
+}
+mutation {
+  createOrder (creator: "Имя заказчика", productNames: ["Название товара", "Название товара"], productNumber: [Число единиц товара, Число единиц товара])
 }
 ```
 
@@ -769,6 +778,81 @@ query {
                 "desciption": "Прекрасный стул",
                 "id": 6,
                 "name": "Стул"
+            }
+        ]
+    }
+}
+```
+* Запрос на создание заказа <br>
+Запрос: **POST** http://127.0.0.1:8084/getAllProducts <br>
+Запрос тела в формате **GraphQL**: <br>
+```GraphQL
+mutation {
+  createOrder (creator: "rueie", productNames: ["Как выучить с++ за месяц", "100 рецептов для новичков"], productNumber: [1, 120])
+}
+```
+__БД товаров до получения запроса__
+| name | descr | id | quantity|
+| :---: | :---: | :---: | :---: |
+|Как выучить с++ за месяц|Книга про базовые знания в с++|1|100|
+|100 рецептов для новичков|100 различных рецептов для начианющих готовить|2|100|
+|Война и мир|Классика жанра|3|100|
+|Сборник анекдотов|Сборник анекдотов квн 2000-х годов|4|100
+
+__БД заказов до получения запроса__
+```
+172.20.0.2:30002> keys rueie*
+(empty array)
+```
+__БД товаров после получения запроса__
+| name | descr | id | quantity|
+| :---: | :---: | :---: | :---: |
+|Как выучить с++ за месяц|Книга про базовые знания в с++|1|99|
+|100 рецептов для новичков|100 различных рецептов для начианющих готовить|2|100|
+|Война и мир|Классика жанра|3|100|
+|Сборник анекдотов|Сборник анекдотов квн 2000-х годов|4|100
+
+__БД заказов после получения запроса__
+```
+172.20.0.2:30002> keys rueie*
+1) "rueie:orders/12877bff-1813-4fc5-9ec5-ab3b3516c9be"
+172.20.0.2:30002> get rueie:orders/12877bff-1813-4fc5-9ec5-ab3b3516c9be
+"{\"creator\":\"rueie\",\"state\":\"in progress\",\"list\":[{\"name\":\"\xd0\x9a\xd0\xb0\xd0\xba \xd0\xb2\xd1\x8b\xd1\x83\xd1\x87\xd0\xb8\xd1\x82\xd1\x8c \xd1\x81++ \xd0\xb7\xd0\xb0 \xd0\xbc\xd0\xb5\xd1\x81\xd1\x8f\xd1\x86\",\"number\":1,\"state\":\"done\"},{\"name\":\"100 \xd1\x80\xd0\xb5\xd1\x86\xd0\xb5\xd0\xbf\xd1\x82\xd0\xbe\xd0\xb2 \xd0\xb4\xd0\xbb\xd1\x8f \xd0\xbd\xd0\xbe\xd0\xb2\xd0\xb8\xd1\x87\xd0\xba\xd0\xbe\xd0\xb2\",\"number\":120,\"state\":\"in progress\"}]}"
+```
+__Запрос на получение данных о заказах заказчика__
+```GraphQL
+query {
+    order(name:"rueie") {
+        creator
+        state
+        list {
+            name
+            number
+            state
+        }
+    }
+}
+```
+__Результат запроса__
+```json
+{
+    "data": {
+        "order": [
+            {
+                "creator": "rueie",
+                "list": [
+                    {
+                        "name": "Как выучить с++ за месяц",
+                        "number": 1,
+                        "state": "done"
+                    },
+                    {
+                        "name": "100 рецептов для новичков",
+                        "number": 120,
+                        "state": "in progress"
+                    }
+                ],
+                "state": "in progress"
             }
         ]
     }
